@@ -18,13 +18,13 @@ All data used in this study can be found in the [`data`](https://github.com/cbi-
 
 Using an Autoregressive model ([ARIMA](https://en.wikipedia.org/wiki/Autoregressive_integrated_moving_average)) with fixed effects to capture and compensate for Brexit-related impacts, we find the following Deadweight less schedule.
 
-| Year | GVA (£m) | Deadweight loss | Percentage of GVA (%) |
-|:----:|:--------:|:---------------:|:---------------------:|
-| 2017 |  38,175  |     131.0582    |          0.34         |
-| 2018 |  38,905  |     412.8158    |          1.06         |
-| 2019 |  39,648  |     657.9598    |          1.66         |
-| 2020 |  40,048  |     1,236.54    |          3.09         |
-| 2021 |  40,571  |    1,688.246    |          4.16         |
+| Year | GVA (£m) | Deadweight loss (£m) | Percentage of GVA (%) |
+|:----:|:--------:|:--------------------:|:---------------------:|
+| 2017 |  38,175  |        131.06        |          0.34         |
+| 2018 |  38,905  |        412.82        |          1.06         |
+| 2019 |  39,648  |        657.96        |          1.66         |
+| 2020 |  40,048  |       1,236.54       |          3.09         |
+| 2021 |  40,571  |       1,688.25       |          4.16         |
 
 By the end of 2019, the estimated cumulative deadweight loss from the lack of NI Executive will be approximately £1.2 billion. As uncertainty mounts and investment levels fall, by 2022 the cumulative deadweight loss could reach £4 billion.
 
