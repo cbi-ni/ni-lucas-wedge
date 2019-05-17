@@ -26,19 +26,20 @@ percentage_change <- function(vector) {
 
 calculate_regional_gva <- function(region, gvaData) {
   if (region != 'all') {
-    gvaData %<>% subset(Region == region)
+    gvaData %<>% 
+      subset(Region == region)
   }
   totalRegionalGva <- sapply(
     X = gvaData[, 6:24], 
     FUN = sum) %>% 
     as.vector()
-  GvaPercentageChange <- totalRegionalGva %>% 
+  gvaPercentageChange <- totalRegionalGva %>% 
     percentage_change()
   data.frame(
     year = gvaData[, 6:24] %>% 
       names(),
     totalGVA = totalRegionalGva,
-    percentageChange = GvaPercentageChange,
+    percentageChange = gvaPercentageChange,
     stringsAsFactors = FALSE) %>%
     return()
 }
@@ -48,11 +49,13 @@ calculate_uk_gdp <- function(gdp.data, from = 1960) {
   years <- gdp.data$Year %>% 
     unique() %>%
     subset(. >= from)
-  yearlyGDP <- sapply(years, function(x) {
-    yearlyData <- gdp.data %>% 
-      subset(Year == x) 
-    sum(yearlyData$GDP) %>% 
-      return()
+  yearlyGDP <- sapply(
+    X = years, 
+    FUN = function(x) {
+      yearlyData <- gdp.data %>% 
+        subset(Year == x) 
+      sum(yearlyData$GDP) %>% 
+        return()
   })
   percentageChange <- yearlyGDP %>% 
     percentage_change()
@@ -65,14 +68,14 @@ calculate_uk_gdp <- function(gdp.data, from = 1960) {
 }
 
 
-estimate_lucas_wedge <- function(regional.gva.data, uk.gdp.data) {
+estimate_lucas_wedge <- function(region, regional.gva.data, uk.gdp.data) {
   lucasWedge <- c()
   projected.gva.data <- regional.gva.data[
     regional.gva.data %>% 
       nrow(), 25:29] %>%
     purrr::flatten_dbl()
   regional.gva <- calculate_regional_gva(
-    region = "Northern Ireland", 
+    region = region, 
     gvaData = regional.gva.data)
   counterfactual.projection <- regional.gva$totalGVA %>%
     forecast::auto.arima() %>%
@@ -136,7 +139,7 @@ generate_lucas_wedge_chart <- function(lucas.wedge.data, regional.gva.data) {
 
 
 generate_economic_loss_chart <- function(lucas.wedge.data) {
-  lucasWedge %>%
+  lucas.wedge.data %>%
     ggplot() +
     geom_line(mapping = aes(
       x = year, 
@@ -160,6 +163,7 @@ uk.gdp.data <- DATA_PATH %>%
   read_csv()
 
 lucasWedge <- estimate_lucas_wedge(
+  region = "Northern Ireland",
   regional.gva.data = regional.gva.data, 
   uk.gdp.data = uk.gdp.data)
 
