@@ -5,9 +5,27 @@ library(forecast)
 library(magrittr)
 
 
+#' BBC ONS growth rate: 0.9% (https://www.bbc.co.uk/news/uk-northern-ireland-47306884)
+#' 
+#' Danske Bank & Oxford economic assessment:  economic growth in Northern Ireland will average 1.0% in 2019 and 1.3% in 2020 (https://danskebank.co.uk/-/media/danske-bank/uk/business/economic-analysis/quarterly-sectoral/danske-bank-northern-ireland-quarterly-sectoral-forecasts-2019-q1-final-.-la=en.pdf)
+#' 
+#' Inflation from Bank of England report (https://www.bankofengland.co.uk/inflation-report/2018/august-2018/prospects-for-inflation)
+
+
 DATA_PATH <- getwd() %>% 
   paste0("/data") 
 
+NI_GROWTH_RATE = c(
+  1.7, # CBI
+  0.9, # BBC
+  1.0, # Danske
+  1.3) # Danske
+
+BOE_INFLATION_RATE = c(
+  2.4, 
+  2.1,
+  2.0,
+  2.0)
 
 percentage_change <- function(vector) {
   sapply(
@@ -24,73 +42,51 @@ percentage_change <- function(vector) {
 }
 
 
-calculate_regional_gva <- function(region, gvaData) {
-  if (region != 'all') {
-    gvaData %<>% 
-      subset(Region == region)
-  }
-  totalRegionalGva <- sapply(
-    X = gvaData[, 6:24], 
-    FUN = sum) %>% 
-    as.vector()
-  gvaPercentageChange <- totalRegionalGva %>% 
-    percentage_change()
-  data.frame(
-    year = gvaData[, 6:24] %>% 
-      names(),
-    totalGVA = totalRegionalGva,
-    percentageChange = gvaPercentageChange,
-    stringsAsFactors = FALSE) %>%
-    return()
-}
-
-
-calculate_uk_gdp <- function(gdp.data, from = 1960) {
-  years <- gdp.data$Year %>% 
-    unique() %>%
-    subset(. >= from)
-  yearlyGDP <- sapply(
-    X = years, 
-    FUN = function(x) {
-      yearlyData <- gdp.data %>% 
-        subset(Year == x) 
-      sum(yearlyData$GDP) %>% 
-        return()
-  })
-  percentageChange <- yearlyGDP %>% 
-    percentage_change()
-  data.frame(
-    year = years,
-    totalGDP = yearlyGDP,
-    percentageChange = percentageChange,
-    stringsAsFactors = FALSE) %>%
-    return()
-}
-
-
-estimate_lucas_wedge <- function(region, regional.gva.data, uk.gdp.data) {
-  lucasWedge <- c()
-  projected.gva.data <- regional.gva.data[
-    regional.gva.data %>% 
-      nrow(), 25:29] %>%
+calculate_regional_gva <- function(gvaData) {
+  totalRegionalGva <- gvaData[21, 2:20] %>% 
     purrr::flatten_dbl()
+  data.frame(
+    year = 1998:2016,
+    totalGVA = totalRegionalGva,
+    executiveDummy = 1,
+    stringsAsFactors = FALSE) %>%
+    return()
+}
+
+
+estimate_lucas_wedge <- function(regional.gva.data) {
+  lucasWedge <- c()
   regional.gva <- calculate_regional_gva(
-    region = region, 
     gvaData = regional.gva.data)
-  counterfactual.projection <- regional.gva$totalGVA %>%
+  projectedGva <- sapply(
+    X = 1:(NI_GROWTH_RATE %>% length()), 
+    FUN = function(x) {
+      if (i == 1) {
+        return((
+          (NI_GROWTH_RATE[i] + 100) / 100) * 
+            regional.gva$totalGVA[nrow(regional.gva)])
+      } else {
+        return((
+          (NI_GROWTH_RATE[i] + 100) / 100) * 
+            projectedGva[i-1])
+      }
+    }
+  )
+  counterfactual.projection <- regional.gva %$%
+    totalGVA[1:19] %>%
     forecast::auto.arima() %>%
-    forecast::forecast(
-      projected.gva.data %>% 
-        length()) %>%
+    forecast::forecast(4) %>%
     as.data.frame()
-  for (i in 1:(projected.gva.data %>% length())) {
+  for (i in 1:(deflatedForecast %>% length())) {
     lucasWedge %<>% 
-      append(counterfactual.projection$`Point Forecast`[i] - projected.gva.data[i])
+      append(
+        projected.regional.gva$totalGVA[19+i] - 
+          counterfactual.projection$`Point Forecast`[i])
   }
   data.frame(
-    year = 2017:2021,
-    actual = projected.gva.data,
-    counterfactual = counterfactual.projection$`Point Forecast`,
+    year = 2017:2020,
+    noExecutive = counterfactual.projection$`Point Forecast`,
+    executive = projected.regional.gva$totalGVA[20:23],
     lucasWedge = lucasWedge) %>%
     return()
 }
@@ -98,13 +94,13 @@ estimate_lucas_wedge <- function(region, regional.gva.data, uk.gdp.data) {
 
 generate_lucas_wedge_chart <- function(lucas.wedge.data, regional.gva.data) {
   regional.gva <- calculate_regional_gva(
-    region = "Northern Ireland", 
     gvaData = regional.gva.data)
   
   lucasWedgePlot <- data.frame(
-    year = c(regional.gva$year, lucas.wedge.data$year) %>% as.numeric() + 1,
-    actual = c(regional.gva$totalGVA, lucas.wedge.data$actual),
-    counter = c(regional.gva$totalGVA, lucas.wedge.data$counterfactual),
+    year = c(regional.gva$year, lucas.wedge.data$year) %>% 
+      as.numeric() + 1,
+    actual = c(regional.gva$totalGVA, lucas.wedge.data$noExecutive),
+    counter = c(regional.gva$totalGVA, lucas.wedge.data$executive),
     stringsAsFactors = FALSE) %>% 
     subset(year >= 2014) %>%
     ggplot(
@@ -155,21 +151,15 @@ generate_economic_loss_chart <- function(lucas.wedge.data) {
 
 
 regional.gva.data <- DATA_PATH %>% 
-  paste0("/gross-value-added-data.csv") %>% 
-  read_csv()
-
-uk.gdp.data <- DATA_PATH %>%
-  paste0("/gross-domestic-product-data.csv") %>% 
+  paste0("/cbi-real-gva-ni-data.csv") %>% 
   read_csv()
 
 lucasWedge <- estimate_lucas_wedge(
-  region = "Northern Ireland",
-  regional.gva.data = regional.gva.data, 
-  uk.gdp.data = uk.gdp.data)
-
-economicLossChart <- generate_economic_loss_chart(
-  lucas.wedge.data = lucasWedge)
-
-lucasWedgePlot <- generate_lucas_wedge_chart(
-  lucas.wedge.data = lucasWedge, 
   regional.gva.data = regional.gva.data)
+
+economicLossChart <- lucasWedge %>% 
+  generate_economic_loss_chart()
+
+lucasWedgePlot <- lucasWedge %>% 
+  generate_lucas_wedge_chart(
+    regional.gva.data = regional.gva.data)
